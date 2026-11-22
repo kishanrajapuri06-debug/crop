@@ -1,13 +1,16 @@
 
-from flask import Flask, render_template, request, jsonify
-
 import math
+import os
+
+from flask import Flask, render_template, request, jsonify
 
 from recommender import (
     predict_top_crops,
     train_model,
-    load_model,
-    get_feature_importance
+    get_feature_importance,
+    get_crop_names,
+    is_dataset_ready,
+    is_model_ready
 )
 
 from database import (
@@ -17,15 +20,22 @@ from database import (
     get_history_by_id,
     delete_history,
     clear_history,
-    get_database_stats
+    get_database_stats,
+    sync_crop_catalog
 )
 
 
 # --------------------------------------------------
 # FLASK CONFIGURATION
-# --------------------------------------------------
 
-app = Flask(__name__)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+app = Flask(
+    __name__,
+    template_folder=os.path.join(BASE_DIR, "templates"),
+    static_folder=os.path.join(BASE_DIR, "static"),
+    static_url_path="/static"
+)
 
 app.config["JSON_SORT_KEYS"] = False
 
@@ -35,6 +45,12 @@ app.config["JSON_SORT_KEYS"] = False
 # --------------------------------------------------
 
 initialize_database()
+
+if is_dataset_ready():
+    try:
+        sync_crop_catalog(get_crop_names())
+    except (OSError, ValueError) as error:
+        app.logger.warning("Unable to sync the crop catalog: %s", error)
 
 
 # --------------------------------------------------
@@ -55,7 +71,9 @@ def health_check():
 
     return jsonify({
         "status": "success",
-        "message": "Crop Recommendation System backend is running."
+        "message": "Crop Recommendation System backend is running.",
+        "dataset_ready": is_dataset_ready(),
+        "model_ready": is_model_ready()
     }), 200
 
 
@@ -404,8 +422,12 @@ def train_model_api():
 
 if __name__ == "__main__":
 
+    debug_enabled = os.environ.get("FLASK_DEBUG", "").strip().lower() in {
+        "1", "true", "yes"
+    }
+
     app.run(
-        host="127.0.0.1",
-        port=5000,
-        debug=True
+        host=os.environ.get("HOST", "127.0.0.1"),
+        port=int(os.environ.get("PORT", "5000")),
+        debug=debug_enabled
     )

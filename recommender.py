@@ -89,6 +89,25 @@ def load_dataset():
     return data
 
 
+def get_crop_names():
+    """Return the crop labels available in the training dataset."""
+
+    data = load_dataset()
+    return sorted(data[TARGET].unique().tolist())
+
+
+def is_dataset_ready():
+    """Return whether the training dataset is present."""
+
+    return os.path.isfile(DATASET_PATH)
+
+
+def is_model_ready():
+    """Return whether a trained model artifact is present."""
+
+    return os.path.isfile(MODEL_PATH)
+
+
 # --------------------------------------------------
 # MODEL TRAINING
 # --------------------------------------------------

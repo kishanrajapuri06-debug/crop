@@ -75,6 +75,30 @@ def initialize_database():
     print("Database initialized successfully.")
 
 
+def sync_crop_catalog(crop_names):
+    """Add dataset crop labels to the catalog without duplicating rows."""
+
+    cleaned_names = sorted({
+        str(name).strip()
+        for name in crop_names
+        if str(name).strip()
+    })
+
+    if not cleaned_names:
+        return
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.executemany(
+        "INSERT OR IGNORE INTO crops (crop_name) VALUES (?)",
+        [(name,) for name in cleaned_names]
+    )
+
+    connection.commit()
+    connection.close()
+
+
 # --------------------------------------------------
 # SAVE RECOMMENDATION HISTORY
 # --------------------------------------------------

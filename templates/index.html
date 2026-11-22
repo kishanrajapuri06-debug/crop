@@ -1,31 +1,35 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+    <meta name="description" content="SmartHarvest helps farmers explore crop recommendations using agricultural and environmental data.">
+
     <title>SmartHarvest | Smart Crop Recommendation</title>
 
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 
 <body>
 
-    <!-- Navigation Bar -->
-    <header>
+    <!-- NAVIGATION -->
+    <header class="header">
         <nav class="navbar">
 
-            <div class="logo">
-                🌱 SmartHarvest
-            </div>
+            <a href="#home" class="logo">
+                <span class="logo-icon">🌱</span>
+                <span>SmartHarvest</span>
+            </a>
 
             <ul class="nav-links">
                 <li><a href="#home">Home</a></li>
                 <li><a href="#about">About</a></li>
                 <li><a href="#features">Features</a></li>
-                <li><a href="#contact">Contact</a></li>
+                <li><a href="#recommend">Recommend</a></li>
             </ul>
 
             <a href="#recommend" class="nav-button">
@@ -36,108 +40,322 @@
     </header>
 
 
-    <!-- Hero Section -->
-    <section class="hero" id="home">
+    <!-- HERO SECTION -->
+    <main>
 
-        <div class="hero-content">
+        <section class="hero" id="home">
 
-            <span class="tagline">
-                SMART AGRICULTURE • BETTER FUTURE
-            </span>
+            <div class="hero-content">
 
-            <h1>
-                Grow Smarter.<br>
-                <span>Harvest Better.</span>
-            </h1>
+                <div class="tagline">
+                    <span class="tagline-dot"></span>
+                    SMART AGRICULTURE • BETTER FUTURE
+                </div>
 
-            <p>
-                Discover the perfect crop for your soil and climate.
-                Make smarter farming decisions with intelligent
-                crop recommendations.
+                <h1>
+                    Grow Smarter.<br>
+                    <span>Harvest Better.</span>
+                </h1>
+
+                <p class="hero-description">
+                    Discover crop options based on agricultural
+                    conditions. Explore data-driven recommendations
+                    to support smarter farming decisions.
+                </p>
+
+                <div class="hero-buttons">
+
+                    <a href="#recommend" class="primary-btn">
+                        Recommend My Crop
+                        <span>→</span>
+                    </a>
+
+                    <a href="#about" class="secondary-btn">
+                        Learn More
+                    </a>
+
+                </div>
+
+                <div class="hero-stats">
+
+                    <div class="stat">
+                        <h3>7</h3>
+                        <p>Input Parameters</p>
+                    </div>
+
+                    <div class="stat-divider"></div>
+
+                    <div class="stat">
+                        <h3>ML</h3>
+                        <p>Crop Prediction</p>
+                    </div>
+
+                    <div class="stat-divider"></div>
+
+                    <div class="stat">
+                        <h3>Smart</h3>
+                        <p>Decision Support</p>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="hero-image">
+
+                <img
+                    src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200&auto=format&fit=crop"
+                    alt="Green agricultural farmland">
+
+                <div class="image-overlay"></div>
+
+                <div class="floating-card">
+
+                    <div class="floating-icon">🌾</div>
+
+                    <div>
+                        <h4>Smarter Crop Choices</h4>
+                        <p>Data-driven agricultural insights</p>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- ABOUT SECTION -->
+        <section class="about section-padding" id="about">
+
+            <div class="about-content">
+
+                <div class="about-image">
+
+                    <img
+                        src="https://images.unsplash.com/photo-1523742813733-3b9a9e4b7c8b?w=1000&auto=format&fit=crop"
+                        alt="Agricultural farming and crop cultivation"
+                        loading="lazy">
+
+                </div>
+
+                <div class="about-text">
+
+                    <span class="section-label">ABOUT SMART HARVEST</span>
+
+                    <h2>
+                        Technology Meets
+                        <span>Agriculture</span>
+                    </h2>
+
+                    <p>
+                        SmartHarvest uses a machine learning model
+                        trained on agricultural data to recommend
+                        crop labels based on soil nutrient values,
+                        rainfall, temperature, humidity and soil pH.
+                    </p>
+
+                    <p>
+                        Our goal is to provide an accessible
+                        decision-support tool that helps users
+                        explore crop options using agricultural
+                        input data.
+                    </p>
+
+                    <a href="#recommend" class="text-link">
+                        Explore Recommendations →
+                    </a>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- FEATURES -->
+        <section class="features section-padding" id="features">
+
+            <div class="section-heading">
+
+                <span class="section-label">OUR FEATURES</span>
+
+                <h2>Making Farming Smarter</h2>
+
+                <p>
+                    Explore agricultural insights powered by
+                    data and machine learning.
+                </p>
+
+            </div>
+
+            <div class="feature-container">
+
+                <article class="feature-card">
+
+                    <div class="feature-icon green-icon">
+                        🌱
+                    </div>
+
+                    <h3>Crop Prediction</h3>
+
+                    <p>
+                        Explore crop predictions based on
+                        agricultural input parameters.
+                    </p>
+
+                </article>
+
+
+                <article class="feature-card">
+
+                    <div class="feature-icon blue-icon">
+                        🌦️
+                    </div>
+
+                    <h3>Climate Parameters</h3>
+
+                    <p>
+                        Consider temperature, humidity and
+                        rainfall in crop classification.
+                    </p>
+
+                </article>
+
+
+                <article class="feature-card">
+
+                    <div class="feature-icon orange-icon">
+                        🧪
+                    </div>
+
+                    <h3>Soil Nutrients</h3>
+
+                    <p>
+                        Analyze nitrogen, phosphorus,
+                        potassium and soil pH values.
+                    </p>
+
+                </article>
+
+            </div>
+
+        </section>
+
+
+        <!-- RECOMMENDATION SECTION -->
+        <section class="recommend section-padding" id="recommend">
+
+            <div class="recommend-header">
+
+                <span class="section-label">
+                    CROP RECOMMENDATION
+                </span>
+
+                <h2>Find Your Crop</h2>
+
+                <p>
+                    Enter your agricultural conditions
+                    to explore crop predictions generated
+                    by our machine learning model.
+                </p>
+
+            </div>
+
+            <div class="recommendation-panel">
+
+                <div class="recommendation-intro">
+
+                    <div class="recommendation-icon">
+                        🌿
+                    </div>
+
+                    <div>
+
+                        <h3>Crop Prediction System</h3>
+
+                        <p>
+                            Provide the required agricultural
+                            measurements to get crop predictions.
+                        </p>
+
+                    </div>
+
+                </div>
+
+                <p class="model-status" id="model-status" role="status" aria-live="polite">
+                    Checking recommendation model…
+                </p>
+
+                <button
+                    type="button"
+                    class="primary-btn recommendation-start"
+                    onclick="startRecommendation()">
+
+                    Start Recommendation
+                    <span>→</span>
+
+                </button>
+
+                <!-- JavaScript dynamically inserts the form here -->
+
+            </div>
+
+            <p class="recommendation-disclaimer">
+                Predictions are based on the training dataset.
+                They are informational and should not replace
+                local agricultural guidance or soil testing.
             </p>
 
-            <div class="hero-buttons">
+        </section>
 
-                <a href="#recommend" class="primary-btn">
-                    Recommend My Crop →
+
+    </main>
+
+
+    <!-- FOOTER -->
+    <footer class="footer" id="contact">
+
+        <div class="footer-content">
+
+            <div class="footer-brand">
+
+                <a href="#home" class="logo footer-logo">
+                    <span class="logo-icon">🌱</span>
+                    <span>SmartHarvest</span>
                 </a>
 
-                <a href="#about" class="secondary-btn">
-                    Learn More
-                </a>
+                <p>
+                    Smart Farming. Sustainable Future.
+                </p>
+
+            </div>
+
+            <div class="footer-links">
+
+                <a href="#home">Home</a>
+                <a href="#about">About</a>
+                <a href="#features">Features</a>
+                <a href="#recommend">Recommend</a>
 
             </div>
 
         </div>
 
-        <div class="hero-image">
-            <img
-                src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1000"
-                alt="Beautiful green agricultural farmland">
-        </div>
+        <div class="footer-bottom">
 
-    </section>
-
-
-    <!-- Features Section -->
-    <section class="features" id="features">
-
-        <div class="section-heading">
-            <span>OUR FEATURES</span>
-            <h2>Making Farming Smarter</h2>
-            <p>Technology that helps farmers make better decisions.</p>
-        </div>
-
-        <div class="feature-container">
-
-            <div class="feature-card">
-                <div class="feature-icon">🌱</div>
-                <h3>Crop Recommendation</h3>
-                <p>Find the most suitable crops based on soil conditions.</p>
-            </div>
-
-            <div class="feature-card">
-                <div class="feature-icon">🌦️</div>
-                <h3>Weather Analysis</h3>
-                <p>Consider temperature, humidity and rainfall conditions.</p>
-            </div>
-
-            <div class="feature-card">
-                <div class="feature-icon">🧪</div>
-                <h3>Soil Analysis</h3>
-                <p>Analyze nitrogen, phosphorus, potassium and soil pH.</p>
-            </div>
+            <p>
+                © 2026 SmartHarvest.
+                Crop Recommendation System.
+            </p>
 
         </div>
 
-    </section>
-
-
-    <!-- Recommendation Section Placeholder -->
-    <section class="recommend" id="recommend">
-
-        <h2>Ready to Find Your Perfect Crop?</h2>
-
-        <p>
-            Let SmartHarvest help you make smarter agricultural decisions.
-        </p>
-
-        <button onclick="startRecommendation()">
-            Start Recommendation →
-        </button>
-
-    </section>
-
-
-    <!-- Footer -->
-    <footer id="contact">
-        <h3>🌱 SmartHarvest</h3>
-        <p>Smart Farming. Sustainable Future.</p>
-        <p>© 2026 SmartHarvest. All Rights Reserved.</p>
     </footer>
 
 
-    <script src="script.js"></script>
+    <!-- JAVASCRIPT -->
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 
 </body>
 </html>

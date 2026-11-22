@@ -1,29 +1,50 @@
 
 document.addEventListener("DOMContentLoaded", () => {
     const recommendSection = document.querySelector("#recommend");
+    const recommendationPanel = recommendSection?.querySelector(
+        ".recommendation-panel"
+    );
+    const modelStatus = document.querySelector("#model-status");
 
-    if (!recommendSection) return;
+    if (modelStatus) {
+        fetch("/api/health")
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error("Health check failed.");
+                }
+                return response.json();
+            })
+            .then((health) => {
+                if (health.model_ready) {
+                    modelStatus.textContent = "The recommendation model is ready.";
+                    modelStatus.dataset.state = "ready";
+                } else {
+                    modelStatus.textContent =
+                        "The model is not trained yet. Run `python recommender.py` before requesting recommendations.";
+                    modelStatus.dataset.state = "error";
+                }
+            })
+            .catch(() => {
+                modelStatus.textContent =
+                    "Could not check model readiness. Make sure the Flask server is running.";
+                modelStatus.dataset.state = "error";
+            });
+    }
+
+    if (!recommendSection || !recommendationPanel) return;
 
     // Create the recommendation form dynamically
     const formContainer = document.createElement("div");
     formContainer.id = "recommendation-form-container";
 
     formContainer.innerHTML = `
-        <form id="crop-form" style="
-            max-width: 700px;
-            margin: 30px auto;
-            text-align: left;
-        ">
+        <form id="crop-form">
 
-            <h3 style="margin-bottom: 20px;">
+            <h3>
                 Enter Agricultural Parameters
             </h3>
 
-            <div style="
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-                gap: 15px;
-            ">
+            <div class="crop-form-grid">
 
                 <div class="form-group">
                     <label for="N">Nitrogen (N)</label>
@@ -73,19 +94,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
             </div>
 
-            <button type="submit" id="submit-btn"
-                style="margin-top: 25px;">
+            <button type="submit" id="submit-btn">
                 Analyze & Recommend Crops →
             </button>
 
         </form>
 
-        <div id="recommendation-result"
-            style="margin-top: 30px;">
-        </div>
+        <div id="recommendation-result"></div>
     `;
 
-    recommendSection.appendChild(formContainer);
+    recommendationPanel.appendChild(formContainer);
 
     // Initially hide the form
     formContainer.style.display = "none";
@@ -195,14 +213,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const card = document.createElement("div");
 
-            card.style.cssText = `
-                padding: 20px;
-                margin: 15px 0;
-                border-radius: 12px;
-                background: #f0f7f0;
-                border: 1px solid #d5e8d5;
-                text-align: left;
-            `;
+            card.className = "recommendation-card";
 
             const cropName = document.createElement("h4");
             cropName.textContent = `${index + 1}. ${item.crop}`;
@@ -215,11 +226,7 @@ document.addEventListener("DOMContentLoaded", () => {
             note.textContent =
                 "This score reflects the model's output, not a guaranteed crop suitability or yield probability.";
 
-            note.style.cssText = `
-                font-size: 13px;
-                color: #555;
-                margin-top: 8px;
-            `;
+            note.className = "recommendation-note";
 
             card.appendChild(cropName);
             card.appendChild(score);
