@@ -29,6 +29,17 @@ def get_connection():
     return connection
 
 
+def _create_history_table(cursor):
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS recommendation_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            input_data TEXT NOT NULL,
+            recommended_crops TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+    """)
+
+
 # --------------------------------------------------
 # DATABASE INITIALIZATION
 # --------------------------------------------------
@@ -49,25 +60,58 @@ def initialize_database():
         )
     """)
 
-    # Recommendation history table
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS recommendation_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-
-            nitrogen REAL NOT NULL,
-            phosphorus REAL NOT NULL,
-            potassium REAL NOT NULL,
-
-            temperature REAL NOT NULL,
-            humidity REAL NOT NULL,
-            ph REAL NOT NULL,
-            rainfall REAL NOT NULL,
-
-            recommended_crops TEXT NOT NULL,
-
-            created_at TEXT NOT NULL
-        )
+        SELECT name
+        FROM sqlite_master
+        WHERE type = 'table' AND name = 'recommendation_history'
     """)
+    history_table_exists = cursor.fetchone() is not None
+
+    if history_table_exists:
+        cursor.execute("PRAGMA table_info(recommendation_history)")
+        history_columns = {
+            row["name"] for row in cursor.fetchall()
+        }
+
+        if "input_data" not in history_columns:
+            cursor.execute(
+                "ALTER TABLE recommendation_history "
+                "RENAME TO recommendation_history_legacy"
+            )
+            _create_history_table(cursor)
+
+            cursor.execute(
+                "SELECT * FROM recommendation_history_legacy"
+            )
+            legacy_records = cursor.fetchall()
+
+            for record in legacy_records:
+                legacy_input = {
+                    "N": record["nitrogen"],
+                    "P": record["phosphorus"],
+                    "K": record["potassium"],
+                    "temperature": record["temperature"],
+                    "humidity": record["humidity"],
+                    "ph": record["ph"],
+                    "rainfall": record["rainfall"]
+                }
+                cursor.execute("""
+                    INSERT INTO recommendation_history (
+                        id, input_data, recommended_crops, created_at
+                    )
+                    VALUES (?, ?, ?, ?)
+                """, (
+                    record["id"],
+                    json.dumps(legacy_input),
+                    record["recommended_crops"],
+                    record["created_at"]
+                ))
+
+            cursor.execute(
+                "DROP TABLE recommendation_history_legacy"
+            )
+    else:
+        _create_history_table(cursor)
 
     connection.commit()
     connection.close()
@@ -76,7 +120,7 @@ def initialize_database():
 
 
 def sync_crop_catalog(crop_names):
-    """Add dataset crop labels to the catalog without duplicating rows."""
+    """Keep the crop catalog aligned with the current dataset labels."""
 
     cleaned_names = sorted({
         str(name).strip()
@@ -89,6 +133,12 @@ def sync_crop_catalog(crop_names):
 
     connection = get_connection()
     cursor = connection.cursor()
+
+    placeholders = ", ".join("?" for _ in cleaned_names)
+    cursor.execute(
+        f"DELETE FROM crops WHERE crop_name NOT IN ({placeholders})",
+        cleaned_names
+    )
 
     cursor.executemany(
         "INSERT OR IGNORE INTO crops (crop_name) VALUES (?)",
@@ -119,25 +169,13 @@ def save_recommendation(input_data, recommendations):
 
     cursor.execute("""
         INSERT INTO recommendation_history (
-            nitrogen,
-            phosphorus,
-            potassium,
-            temperature,
-            humidity,
-            ph,
-            rainfall,
+            input_data,
             recommended_crops,
             created_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?)
     """, (
-        input_data["N"],
-        input_data["P"],
-        input_data["K"],
-        input_data["temperature"],
-        input_data["humidity"],
-        input_data["ph"],
-        input_data["rainfall"],
+        json.dumps(input_data),
         recommendations_json,
         timestamp
     ))
@@ -179,6 +217,9 @@ def get_all_history(limit=100):
         item["recommended_crops"] = json.loads(
             item["recommended_crops"]
         )
+        item["input_data"] = json.loads(
+            item["input_data"]
+        )
 
         history.append(item)
 
@@ -211,6 +252,9 @@ def get_history_by_id(record_id):
 
     item["recommended_crops"] = json.loads(
         item["recommended_crops"]
+    )
+    item["input_data"] = json.loads(
+        item["input_data"]
     )
 
     return item

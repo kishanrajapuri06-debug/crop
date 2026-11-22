@@ -1,5 +1,4 @@
 
-import math
 import os
 
 from flask import Flask, render_template, request, jsonify
@@ -9,8 +8,10 @@ from recommender import (
     train_model,
     get_feature_importance,
     get_crop_names,
+    get_input_options,
     is_dataset_ready,
-    is_model_ready
+    is_model_ready,
+    validate_prediction_input
 )
 
 from database import (
@@ -77,74 +78,30 @@ def health_check():
     }), 200
 
 
+@app.route("/api/options", methods=["GET"])
+def recommendation_options():
+
+    try:
+        return jsonify({
+            "status": "success",
+            "options": get_input_options()
+        }), 200
+    except (FileNotFoundError, ValueError) as error:
+        return jsonify({
+            "status": "error",
+            "message": str(error)
+        }), 503
+
+
 # --------------------------------------------------
 # INPUT VALIDATION
 # --------------------------------------------------
 
-REQUIRED_FEATURES = [
-    "N",
-    "P",
-    "K",
-    "temperature",
-    "humidity",
-    "ph",
-    "rainfall"
-]
-
-
 def validate_input(data):
-
-    if not isinstance(data, dict):
-        return None, "Request must contain a JSON object."
-
-    missing_features = [
-        feature for feature in REQUIRED_FEATURES
-        if feature not in data
-    ]
-
-    if missing_features:
-        return None, (
-            "Missing features: "
-            + ", ".join(missing_features)
-        )
-
-    validated_data = {}
-
     try:
-        for feature in REQUIRED_FEATURES:
-
-            value = data[feature]
-
-            if isinstance(value, bool):
-                return None, f"{feature} must be numeric."
-
-            value = float(value)
-
-            if not math.isfinite(value):
-                return None, f"{feature} must be a finite number."
-
-            validated_data[feature] = value
-
-    except (TypeError, ValueError):
-        return None, "All input features must be numeric."
-
-    # Basic domain validation
-    if any(
-        validated_data[feature] < 0
-        for feature in ["N", "P", "K", "rainfall"]
-    ):
-        return None, "N, P, K and rainfall cannot be negative."
-
-    if not 0 <= validated_data["ph"] <= 14:
-        return None, "Soil pH must be between 0 and 14."
-
-    if not 0 <= validated_data["humidity"] <= 100:
-        return None, "Humidity must be between 0 and 100."
-
-    if not -50 <= validated_data["temperature"] <= 70:
-        return None, "Temperature is outside the supported input range."
-
-    return validated_data, None
+        return validate_prediction_input(data), None
+    except (TypeError, ValueError) as error:
+        return None, str(error)
 
 
 # --------------------------------------------------

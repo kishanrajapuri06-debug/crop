@@ -1,7 +1,9 @@
 
 import os
+import math
 import joblib
 import pandas as pd
+from functools import lru_cache
 
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
@@ -10,6 +12,10 @@ from sklearn.metrics import (
     classification_report,
     confusion_matrix
 )
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.pipeline import Pipeline
+
 
 # --------------------------------------------------
 # CONFIGURATION
@@ -17,29 +23,43 @@ from sklearn.metrics import (
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-DATASET_PATH = os.path.join(BASE_DIR, "Crop_recommendation.csv")
+DATASET_PATH = os.path.join(
+    BASE_DIR,
+    "Crop recommendation dataset.csv"
+)
 MODEL_DIR = os.path.join(BASE_DIR, "models")
-MODEL_PATH = os.path.join(MODEL_DIR, "crop_model.pkl")
+MODEL_PATH = os.path.join(MODEL_DIR, "crop_model_v2.pkl")
 
-FEATURES = [
-    "N",
-    "P",
-    "K",
-    "temperature",
-    "humidity",
-    "ph",
-    "rainfall"
+CATEGORICAL_FEATURES = [
+    "soil",
+    "season",
+    "water_source"
 ]
 
-TARGET = "label"
+NUMERICAL_FEATURES = [
+    "waterrequired"
+]
+
+FEATURES = CATEGORICAL_FEATURES + NUMERICAL_FEATURES
+
+TARGET = "crops"
+
+
+def normalize_category(value):
+    """Normalize whitespace and casing in dataset category values."""
+
+    return " ".join(
+        str(value).replace("\u00a0", " ").split()
+    ).casefold()
 
 
 # --------------------------------------------------
 # DATA LOADING
 # --------------------------------------------------
 
+@lru_cache(maxsize=1)
 def load_dataset():
-    """Load and validate the crop recommendation dataset."""
+    """Load and validate the new crop recommendation dataset."""
 
     if not os.path.exists(DATASET_PATH):
         raise FileNotFoundError(
@@ -48,8 +68,12 @@ def load_dataset():
 
     data = pd.read_csv(DATASET_PATH)
 
-    # Remove accidental whitespace from column names
-    data.columns = data.columns.str.strip()
+    # Normalize column names
+    data.columns = (
+        data.columns
+        .str.strip()
+        .str.lower()
+    )
 
     required_columns = FEATURES + [TARGET]
 
@@ -63,79 +87,126 @@ def load_dataset():
             f"Missing columns in dataset: {missing_columns}"
         )
 
-    # Select only the columns needed for this model
+    # Select required columns only
     data = data[required_columns].copy()
 
-    # Convert numerical features to numeric values
-    for column in FEATURES:
-        data[column] = pd.to_numeric(
-            data[column], errors="coerce"
+    # Normalize categories, including non-breaking spaces in soil names.
+    for column in CATEGORICAL_FEATURES:
+        data[column] = (
+            data[column]
+            .astype("string")
+            .str.replace("\u00a0", " ", regex=False)
+            .str.replace(r"\s+", " ", regex=True)
+            .str.strip()
+            .str.casefold()
         )
 
-    # Remove missing or invalid rows
+    # Convert crop water requirement to a number.
+    data["waterrequired"] = pd.to_numeric(
+        data["waterrequired"],
+        errors="coerce"
+    )
+
+    # Clean target labels
+    data[TARGET] = (
+        data[TARGET]
+        .astype("string")
+        .str.strip()
+    )
+
+    # Remove invalid rows
     data.dropna(inplace=True)
 
-    # Remove rows without a crop label
+    # Remove empty values
+    for column in FEATURES + [TARGET]:
+        data = data[
+            data[column].astype(str).str.strip() != ""
+        ]
+
+    # Water requirement is measured in millimetres per crop cycle.
     data = data[
-        data[TARGET].astype(str).str.strip() != ""
+        data["waterrequired"] >= 0
     ]
 
-    # Ensure labels are strings
-    data[TARGET] = data[TARGET].astype(str).str.strip()
-
     if data.empty:
-        raise ValueError("Dataset contains no valid rows.")
+        raise ValueError(
+            "Dataset contains no valid rows."
+        )
+
+    if data[TARGET].nunique() < 2:
+        raise ValueError(
+            "Dataset must contain at least two crop classes."
+        )
 
     return data
 
 
+# --------------------------------------------------
+# DATASET INFORMATION
+# --------------------------------------------------
+
 def get_crop_names():
-    """Return the crop labels available in the training dataset."""
+    """Return available crop labels."""
 
     data = load_dataset()
-    return sorted(data[TARGET].unique().tolist())
+
+    return sorted(
+        data[TARGET].unique().tolist()
+    )
+
+
+def get_input_options():
+    """Return supported select values and the water input range."""
+
+    data = load_dataset()
+
+    return {
+        feature: sorted(data[feature].unique().tolist())
+        for feature in CATEGORICAL_FEATURES
+    } | {
+        "waterrequired": {
+            "min": float(data["waterrequired"].min()),
+            "max": float(data["waterrequired"].max())
+        }
+    }
 
 
 def is_dataset_ready():
-    """Return whether the training dataset is present."""
+    """Check if dataset exists."""
 
     return os.path.isfile(DATASET_PATH)
 
 
 def is_model_ready():
-    """Return whether a trained model artifact is present."""
+    """Check if trained model exists."""
 
     return os.path.isfile(MODEL_PATH)
 
 
 # --------------------------------------------------
-# MODEL TRAINING
+# MODEL PIPELINE
 # --------------------------------------------------
 
-def train_model():
-    """Train, evaluate and save the Random Forest model."""
+def create_model_pipeline():
 
-    data = load_dataset()
-
-    X = data[FEATURES]
-    y = data[TARGET]
-
-    if y.nunique() < 2:
-        raise ValueError(
-            "Training requires at least two crop classes."
-        )
-
-    # Split dataset into training and testing data
-    X_train, X_test, y_train, y_test = train_test_split(
-        X,
-        y,
-        test_size=0.20,
-        random_state=42,
-        stratify=y
+    preprocessing = ColumnTransformer(
+        transformers=[
+            (
+                "categorical",
+                OneHotEncoder(
+                    handle_unknown="ignore"
+                ),
+                CATEGORICAL_FEATURES
+            ),
+            (
+                "numerical",
+                "passthrough",
+                NUMERICAL_FEATURES
+            )
+        ]
     )
 
-    # Create Random Forest model
-    model = RandomForestClassifier(
+    classifier = RandomForestClassifier(
         n_estimators=300,
         max_depth=None,
         min_samples_split=2,
@@ -145,13 +216,61 @@ def train_model():
         n_jobs=-1
     )
 
+    pipeline = Pipeline([
+        ("preprocessing", preprocessing),
+        ("classifier", classifier)
+    ])
+
+    return pipeline
+
+
+# --------------------------------------------------
+# MODEL TRAINING
+# --------------------------------------------------
+
+def train_model():
+    """Train, evaluate and save the crop recommendation model."""
+
+    data = load_dataset()
+
+    X = data[FEATURES]
+    y = data[TARGET]
+
+    # Ensure every class has sufficient samples
+    class_counts = y.value_counts()
+
+    insufficient_classes = class_counts[
+        class_counts < 2
+    ]
+
+    if not insufficient_classes.empty:
+        raise ValueError(
+            "Each crop class requires at least "
+            "2 samples for stratified training."
+        )
+
+    # Split dataset
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=0.20,
+        random_state=42,
+        stratify=y
+    )
+
+    # Create pipeline
+    pipeline = create_model_pipeline()
+
     # Train model
-    model.fit(X_train, y_train)
+    pipeline.fit(X_train, y_train)
 
-    # Evaluate model on test data
-    y_pred = model.predict(X_test)
+    # Evaluate
+    y_pred = pipeline.predict(X_test)
 
-    accuracy = accuracy_score(y_test, y_pred)
+    accuracy = accuracy_score(
+        y_test,
+        y_pred
+    )
 
     report = classification_report(
         y_test,
@@ -162,22 +281,27 @@ def train_model():
     matrix = confusion_matrix(
         y_test,
         y_pred,
-        labels=model.classes_
+        labels=pipeline.classes_
     )
 
-    # Save trained model
+    # Save model
     os.makedirs(MODEL_DIR, exist_ok=True)
 
     model_artifact = {
-        "model": model,
+        "model": pipeline,
         "features": FEATURES,
-        "classes": list(model.classes_),
+        "target": TARGET,
+        "classes": list(pipeline.classes_),
         "accuracy": float(accuracy)
     }
 
-    joblib.dump(model_artifact, MODEL_PATH)
+    joblib.dump(
+        model_artifact,
+        MODEL_PATH
+    )
 
     print("\n========== MODEL TRAINING ==========")
+
     print(f"Dataset rows: {len(data)}")
     print(f"Training rows: {len(X_train)}")
     print(f"Testing rows: {len(X_test)}")
@@ -197,7 +321,7 @@ def train_model():
         "accuracy": accuracy,
         "report": report,
         "confusion_matrix": matrix,
-        "model": model
+        "model": pipeline
     }
 
 
@@ -206,7 +330,7 @@ def train_model():
 # --------------------------------------------------
 
 def load_model():
-    """Load a previously trained model."""
+    """Load the saved pipeline."""
 
     if not os.path.exists(MODEL_PATH):
         raise FileNotFoundError(
@@ -216,26 +340,30 @@ def load_model():
 
     artifact = joblib.load(MODEL_PATH)
 
+    if (
+        not isinstance(artifact, dict)
+        or artifact.get("features") != FEATURES
+        or artifact.get("target") != TARGET
+    ):
+        raise FileNotFoundError(
+            "The saved model uses an older data schema. "
+            "Run python recommender.py to retrain it."
+        )
+
     return artifact["model"]
 
 
 # --------------------------------------------------
-# CROP PREDICTION
+# INPUT VALIDATION
 # --------------------------------------------------
 
-def predict_top_crops(input_data, top_n=3):
-    """
-    Predict the most likely crop labels.
+def validate_prediction_input(input_data):
 
-    input_data must be a dictionary containing:
-    N, P, K, temperature, humidity, ph and rainfall.
+    if not isinstance(input_data, dict):
+        raise ValueError(
+            "Input must be a dictionary."
+        )
 
-    Returns a list of crops ranked by model probability.
-    """
-
-    model = load_model()
-
-    # Validate input features
     missing_features = [
         feature for feature in FEATURES
         if feature not in input_data
@@ -246,40 +374,111 @@ def predict_top_crops(input_data, top_n=3):
             f"Missing input features: {missing_features}"
         )
 
-    # Build input dataframe in the correct order
+    validated_data = {}
+
+    dataset = load_dataset()
+
+    for feature in CATEGORICAL_FEATURES:
+
+        value = input_data[feature]
+
+        if value is None or str(value).strip() == "":
+            raise ValueError(
+                f"{feature} cannot be empty."
+            )
+
+        normalized_value = normalize_category(value)
+        allowed_values = set(dataset[feature].unique())
+
+        if normalized_value not in allowed_values:
+            raise ValueError(
+                f"Choose a supported {feature.replace('_', ' ')} value."
+            )
+
+        validated_data[feature] = normalized_value
+
+    water_value = input_data["waterrequired"]
+
+    if isinstance(water_value, bool):
+        raise ValueError(
+            "Water requirement must be a number."
+        )
+
+    try:
+        water_value = float(water_value)
+    except (TypeError, ValueError) as error:
+        raise ValueError(
+            "Water requirement must be a number."
+        ) from error
+
+    if not math.isfinite(water_value):
+        raise ValueError(
+            "Water requirement must be a finite number."
+        )
+
+    min_water = float(dataset["waterrequired"].min())
+    max_water = float(dataset["waterrequired"].max())
+
+    if not min_water <= water_value <= max_water:
+        raise ValueError(
+            f"Water requirement must be between {min_water:g} "
+            f"and {max_water:g} mm."
+        )
+
+    validated_data["waterrequired"] = water_value
+
+    return validated_data
+
+
+# --------------------------------------------------
+# CROP PREDICTION
+# --------------------------------------------------
+
+def predict_top_crops(input_data, top_n=3):
+    """
+    Predict crop classes using:
+
+    soil
+    season
+    water_source
+    waterrequired
+    """
+
+    model = load_model()
+
+    validated_data = validate_prediction_input(
+        input_data
+    )
+
     input_df = pd.DataFrame(
-        [[input_data[feature] for feature in FEATURES]],
+        [validated_data],
         columns=FEATURES
     )
 
-    # Validate numeric values
-    for column in FEATURES:
-        input_df[column] = pd.to_numeric(
-            input_df[column], errors="raise"
-        )
-
-    if input_df.isnull().any().any():
-        raise ValueError(
-            "Input values cannot be empty."
-        )
-
-    # Get prediction probabilities
-    probabilities = model.predict_proba(input_df)[0]
+    # Generate probabilities
+    probabilities = model.predict_proba(
+        input_df
+    )[0]
 
     classes = model.classes_
 
-    # Sort predictions by probability
+    # Rank crop predictions
     ranked_indices = probabilities.argsort()[::-1]
 
-    top_n = max(1, min(int(top_n), len(classes)))
+    top_n = max(
+        1,
+        min(int(top_n), len(classes))
+    )
 
     results = []
 
     for index in ranked_indices[:top_n]:
+
         results.append({
             "crop": str(classes[index]),
             "probability": round(
-                float(probabilities[index]) * 100, 2
+                float(probabilities[index]) * 100,
+                2
             )
         })
 
@@ -291,18 +490,39 @@ def predict_top_crops(input_data, top_n=3):
 # --------------------------------------------------
 
 def get_feature_importance():
-    """Return model feature importance values."""
+    """Return importance of encoded model features."""
 
     model = load_model()
 
-    importance = model.feature_importances_
+    preprocessing = model.named_steps[
+        "preprocessing"
+    ]
+
+    classifier = model.named_steps[
+        "classifier"
+    ]
+
+    encoded_features = (
+        preprocessing.get_feature_names_out()
+    )
+
+    importance_values = (
+        classifier.feature_importances_
+    )
 
     result = []
 
-    for feature, value in zip(FEATURES, importance):
+    for feature, value in zip(
+        encoded_features,
+        importance_values
+    ):
+
         result.append({
-            "feature": feature,
-            "importance": round(float(value), 4)
+            "feature": str(feature),
+            "importance": round(
+                float(value),
+                4
+            )
         })
 
     result.sort(
@@ -319,18 +539,15 @@ def get_feature_importance():
 
 if __name__ == "__main__":
 
-    # Train and evaluate model
+    # Train model
     train_model()
 
-    # Example prediction
+    # Example input
     sample_input = {
-        "N": 90,
-        "P": 42,
-        "K": 43,
-        "temperature": 25.5,
-        "humidity": 80,
-        "ph": 6.5,
-        "rainfall": 200
+        "soil": "black soil",
+        "season": "kharif",
+        "water_source": "irrigated",
+        "waterrequired": 850
     }
 
     print("\n========== SAMPLE PREDICTION ==========")
@@ -340,7 +557,11 @@ if __name__ == "__main__":
         top_n=3
     )
 
-    for rank, item in enumerate(recommendations, start=1):
+    for rank, item in enumerate(
+        recommendations,
+        start=1
+    ):
+
         print(
             f"{rank}. {item['crop']} - "
             f"{item['probability']}%"
@@ -349,6 +570,7 @@ if __name__ == "__main__":
     print("\n========== FEATURE IMPORTANCE ==========")
 
     for item in get_feature_importance():
+
         print(
             f"{item['feature']}: "
             f"{item['importance']}"
